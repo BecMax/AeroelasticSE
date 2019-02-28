@@ -1,3 +1,20 @@
+# FAST Files
+*.out
+*.outb
+*.inp
+*.fst
+*.sum
+*.wnd
+*.bts
+*.xls
+*.ech
+
+
+# Paths
+#/src/AeroelasticSE/FAST_mdao/ExampleCaseOF/
+
+
+# Python
 *.py[cod]
 *.pyc
 
