@@ -8,10 +8,11 @@
 *.bts
 *.xls
 *.ech
+*.dat
 
 
 # Paths
-#/src/AeroelasticSE/FAST_mdao/ExampleCaseOF/
+/src/AeroelasticSE/FAST_mdao/ExampleCaseOF/
 
 
 # Python
