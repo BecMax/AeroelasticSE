@@ -1,0 +1,1 @@
+python ../DLCrunner.py -i settings.xlsx -s "DLC1.2"
