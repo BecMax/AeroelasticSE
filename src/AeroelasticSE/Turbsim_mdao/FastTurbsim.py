@@ -16,6 +16,8 @@ from openmdao.api import SqliteRecorder
 from AeroelasticSE.FAST_mdao.FST8_aeroelasticsolver import FST8Workflow
 from AeroelasticSE.Turbsim_mdao.turbsim_openmdao import turbsimGroup
 
+from openmdao.api import view_tree
+
 # Initial OpenMDAO problem setup
 top = Problem()
 root = top.root = Group()
@@ -27,7 +29,7 @@ config['fst_masterfile'] = 'Test01.fst'
 config['fst_masterdir']= '../FAST_mdao/wrapper_examples/FST8inputfiles'
 config['fst_runfile'] = caseid
 config['fst_rundir'] = './rundir/'
-config['fst_exe'] = 'openfast'
+config['fst_exe'] = 'C:/cygwin64/home/max.becker/FASTv8/bin/FAST_gwin64.exe'
 #config['fst_exe'] = '../../../../../FAST_v8/bin/FAST_glin64'
 #config['libmap'] = '../../../../../FAST_v8/bin/libmap-1.20.10.dylib'
 config['ad_file_type'] = 1 
@@ -47,7 +49,9 @@ top.driver.add_recorder(recorder)
 # Perform setup and run OpenMDAO problem
 top.setup()
 
-top.root.turbsim_component.wrapper.turbsim_exe = '/Users/jquick/TurbSim/bin/TurbSim_glin64'
+#top.root.turbsim_component.wrapper.turbsim_exe = 'C:/cygwin64/home/max.becker/TurbSimv2/bin/TurbSim_x64.exe'
+#top.root['turbsim_component.wrapper.turbsim_exe'] = 'C:/cygwin64/home/max.becker/TurbSimv2/bin/TurbSim_x64.exe'
+#print top.root['turbsim_component.wrapper.turbsim_exe']
 #top.root.fast_component.writer.fst_vt.steady_wind_params.HWindSpeed = 15.12345
 top.root.fast_component.writer.fst_vt.turbsim_wind_params.Filename = './turbsim_default.bts' # one directory below true location....
 top.root.fast_component.writer.fst_vt.inflow_wind.WindType = 3
@@ -59,8 +63,12 @@ top.root.turbsim_component.run_dir = './rundir'
 #top.root.fast_component.writer.fst_file = './rundir%i/'%i
 top.root.turbsim_component.writer.turbsim_vt.runtime_options.RandSeed1 = 10000 + 11
 top.root.turbsim_component.execute()
+
+top.check_setup()
+view_tree(top)
+
 top.run()
 plt.plot(top['fast_component.RootMxc1'])
 np.save('fout', top['fast_component.RootMxc1'])
 top.cleanup()   #Good practice, especially when using recorder
-plt.savefig('seeds.pdf')
+#plt.savefig('seeds.pdf')

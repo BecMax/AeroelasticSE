@@ -84,23 +84,63 @@ class FST8Workflow (Component):
 			elif key == 'fst_rundir':
 				self.writer.fst_directory = config[key]
 			elif key == 'fst_exe':
-				self.wrapper.FSTexe = config[key]
+				self.reader.FSTexe = config[key]
 			# elif key == 'fst_file_type':
 			# 	self.reader.fst_file_type = config[key]
-			elif key == 'libmap':
-				self.wrapper.libmap = config[key]
 			elif key == 'ad_file_type':
 				self.reader.ad_file_type = config[key]
+			elif key == 'passToNumpy':
+				self.reader.passToNumpy = config[key]	
+			elif key == 'writeElasto':
+				self.reader.writeElasto = config[key]
+			elif key == 'writeBladeStruc':
+				self.reader.writeBladeStruc = config[key]
+			elif key == 'writeTower':
+				self.reader.writeTower = config[key]
+			elif key == 'writeInflow':
+				self.reader.writeInflow = config[key]
+			elif key == 'writeAero':
+				self.reader.writeAero = config[key]
+			elif key == 'writeServo':
+				self.reader.writeServo = config[key]
+			elif key == 'copyBeamDyn': 
+				self.writer.copyBeamDyn = config[key]
+			elif key == 'copyAirfoils': 
+				self.writer.copyAirfoils = config[key]
+			elif key == 'copyAeroBlade': 
+				self.writer.copyAeroBlade = config[key]
+			elif key == 'copyDLL': 
+				self.writer.copyDLL = config[key]
+			elif key == 'copyDLLinfile': 
+				self.writer.copyDLLinfile = config[key]
+			elif key == 'copyTMDamp': 
+				self.writer.copyTMDamp = config[key]
+			elif key == 'copyTMDamp': 
+				self.writer.copyTMDamp = config[key]	
+			#elif key == 'libmap':
+			#	self.wrapper.libmap = config[key]
+		
 
 		self.reader.execute()   #Read/populate vartrees
 		self.writer.fst_vt = self.reader.fst_vt   #Pass vartrees from reader to writer
+		self.writer.writeElasto = self.reader.writeElasto
+		self.writer.writeBladeStruc = self.reader.writeBladeStruc
+		self.writer.writeTower = self.reader.writeTower
+		self.writer.writeInflow = self.reader.writeInflow
+		self.writer.writeAero = self.reader.writeAero
+		self.writer.writeServo = self.reader.writeServo
+		
 		self.writer.InputConfig(**config)   #Edit vartrees according to keys in config dictionary
 
-		# Pass file and directory names from writer to wrapper
+		self.writer.fst_masterdir = self.reader.fst_directory
+		self.writer.FSTexe = self.reader.FSTexe
+		
+        # Pass file and directory names from writer to wrapper
 		self.wrapper.FSTInputFile = self.writer.fst_infile
 		self.wrapper.fst_directory = self.writer.fst_directory
+		self.wrapper.FSTexe = self.writer.FSTexe
 
-		# Check for number of active outputs
+        # Check for number of active outputs
 		self.outkeys = []
 		self.outcounter = 0   #initialize counter
 		self.output_outer_dict = self.writer.fst_vt.outlist.__dict__   #get dictionary of output subtrees
@@ -118,13 +158,19 @@ class FST8Workflow (Component):
 		# outsize = (TMax - TStart)/(DT * DecFact) + 1
 		# self.outsize = ((self.writer.fst_vt.fst_sim_ctrl.TMax - self.writer.fst_vt.fst_out_params.TStart) \
 		# 	/(self.writer.fst_vt.fst_sim_ctrl.DT*self.writer.fst_vt.ed_out_params.DecFact)) + 1
-		self.outsize = int(((self.writer.fst_vt.fst_sim_ctrl.TMax - self.writer.fst_vt.fst_out_params.TStart) \
-			/(self.writer.fst_vt.fst_out_params.DT_Out)) + 1)
+		try: 
+			self.outsize = int(((self.writer.fst_vt.fst_sim_ctrl.TMax - self.writer.fst_vt.fst_out_params.TStart) \
+				/(self.writer.fst_vt.fst_out_params.DT_Out)) + 1)
+		except:
+			self.outsize = int(((self.writer.fst_vt.fst_sim_ctrl.TMax - self.writer.fst_vt.fst_out_params.TStart) \
+				/(self.writer.fst_vt.fst_sim_ctrl.DT  )) + 1)
 
 		# Loop over number of activated outputs, add them all to the OpenMDAO component
 		ct = 0
 		for i in range(0, self.outcounter):
 			self.add_output(self.outkeys[i], shape=[self.outsize])
+			#print 'output channel is %s' %self.outkeys[i]
+			#print 'output channel size is %i' %self.outsize
 			ct = ct + 1
 		self.add_output('Time', shape=[self.outsize])   #add Time variable (included by default)
 		ct = ct + 1
@@ -155,6 +201,8 @@ class FST8Workflow (Component):
 		# Loop over output headers, assign values in 'out' to OpenMDAO outputs
 		# This assumes headers match previously assigned ouputs
 		for i in range(0, len(hdr)):
+			#print 'output header is %s' %hdr[i]
+			#print 'header data length is %iclear' %len(out[:,i])						
 			unknowns[hdr[i]] = out[:,i]   #assigns values to output channel matching header name
 
 

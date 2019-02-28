@@ -3,7 +3,8 @@ import os
 from FST8_reader import Fst8InputReader, Fst8InputBase
 from FST_vartrees_new import FstModel
 import sys
-import copy
+from shutil import copyfile
+from distutils.dir_util import copy_tree
 
 # Builder
 
@@ -33,82 +34,6 @@ class Fst8InputBuilder(object):
 		# update outputs
 		self.fstOut = self.fstS.copy()
 
-# class FUSEDWindInputBuilder(FstInputBuilder):
-#     """
-#     Component for translating FUSED-Wind input vartrees to HAWC2 inputs
-#     """
-
-#     # inputs = Instance(iotype='in')   #[AH] no Instance in omdao1
-	
-#     def __init__(self):
-		
-#         super(FUSEDWindInputBuilder,self).__init__()
-
-#     def execute(self):
-#         """
-#         check which vartrees are passed in the case 
-#         """
-
-#         # connect all variables
-#         if hasattr(self.inputs, 'environment') and hasattr(self.inputs, 'simulation'):
-
-#             self._logger.info('setting wind and simulation inputs')
-
-#             self.fstS.aero_vt.AirDens = self.inputs.environment.density
-#             self.fstS.aero_vt.KinVisc = self.inputs.environment.viscosity
-			
-#             # Ignore TI, kappa, z0 (TODO: turbsim input file structure)
-#             self.fstS.simple_wind_vt.TimeSteps = 2
-
-#             self.fstS.simple_wind_vt.HorSpd = [self.inputs.environment.vhub] * 2
-#             self.fstS.simple_wind_vt.WindDir = [self.inputs.environment.direction] * 2
-#             self.fstS.simple_wind_vt.VerSpd = [0.0] * 2 # TODO: include?
-#             self.fstS.simple_wind_vt.HorShr = [0.0] * 2 # TODO: include?
-#             if self.inputs.environment.inflow_type == 'constant':
-#                 self.fstS.simple_wind_vt.VerShr = [0.0] * 2
-#                 self.fstS.simple_wind_vt.LnVShr = [0.0] * 2
-#             elif self.inputs.environment.inflow_type == 'log':
-#                 self.fstS.simple_wind_vt.VerShr = [0.0] * 2
-#                 self.fstS.simple_wind_vt.LnVShr = [0.0] * 2
-#             elif self.inputs.environment.inflow_type == 'powerlaw':
-#                 self.fstS.simple_wind_vt.VerShr = [self.inputs.environment.shear_exp] * 2
-#                 self.fstS.simple_wind_vt.LnVShr = [0.0] * 2
-#             elif self.inputs.environment.inflow_type == 'linear':
-#                 self.fstS.simple_wind_vt.VerShr = [0.0] * 2
-#                 self.fstS.simple_wind_vt.LnVShr = [0.0] * 2
-#             else:
-#                 self.fstS.simple_wind_vt.VerShr = [0.0] * 2
-#                 self.fstS.simple_wind_vt.LnVShr = [0.0] * 2             
-
-#             self.fstS.simple_wind_vt.GstSpd = [0.0] * 2 # TODO: include?
-
-#             self.fstS.simple_wind_vt.Time = [None] * 2            
-#             self.fstS.simple_wind_vt.Time[0] = self.inputs.simulation.time_start
-#             self.fstS.simple_wind_vt.Time[1] = self.inputs.simulation.time_stop
-#             self.fstS.aero_vt.DTAero = self.inputs.simulation.time_step
-
-#         # call parent that simply copies Ps to Pout
-#         super(FUSEDWindInputBuilder, self).execute()
-
-# '''class FUSEDWindOutputBuilderBase(Component):
-#     """
-#     Component for converting HAWC2 outputs to FUSED-Wind outputs
-#     """
-
-#     output = Slot(iotype='in', desc='HAWC2 output object')
-#     outputs = Slot(iotype='out', desc='FUSED-Wind output vartree')
-
-#     def execute(self):
-
-#         pass
-
-# class FUSEDWindIECOutputBuilder(FUSEDWindOutputBuilderBase):
-
-#     def execute(self):
-
-#         self._logger.info('Converting HAWC2 outputs to FUSED-Wind IEC outputs ..')'''
-
-# Writer
 
 class Fst8InputWriter(Fst8InputBase):
 
@@ -116,9 +41,25 @@ class Fst8InputWriter(Fst8InputBase):
 
 		self.fst_vt = FstModel()
 
-		self.fst_infile = ''   #Master FAST file
-		self.fst_directory = ''   #Directory of master FAST file set
-		self.ad_file_type = 0   #Enum(0, (0,1), iotype='in', desc='Aerodyn file type, 0=old Aerodyn, 1 = new Aerdyn
+		self.fst_infile = ''   #FAST file
+		self.fst_directory = ''   #Directory of FAST file set
+		self.fst_masterdir = ''   #Directory of master FAST file set
+		self.FSTexe = None   #Path to executable
+		self.ad_file_type = 0   #Enum(0, (0,1), iotype='in', desc='Aerodyn file type, 0=old Aerodyn, 1 = new Aerdyn only for AD14
+		
+		self.writeElasto = False
+		self.writeBladeStruc = False
+		self.writeTower = False
+		self.writeInflow = False
+		self.writeAero = False
+		self.writeServo = False
+		
+		self.copyBeamDyn = False
+		self.copyAirfoils = False
+		self.copyAeroBlade = False
+		self.copyDLL = False
+		self.copyDLLinfile = False
+		self.copyTMDamp = False
 		
 		# 
 		# self.fst_file_type = 0   #Enum(0, (0,1),iotype='in', desc='Fst file type, 0=old FAST, 1 = new FAST    
@@ -175,8 +116,7 @@ class Fst8InputWriter(Fst8InputBase):
 				if not success:
 					# These items are specific to FSTWorkflow and are assigned elsewhere
 					if k not in ['fst_masterfile','fst_masterdir','fst_runfile',\
-						'fst_rundir','fst_exe', 'fst_file_type','ad_file_type', \
-						'libmap']:
+						'fst_rundir','fst_exe', 'fst_file_type','ad_file_type']:
 						print "Could not find attribute '{0}'.".format(k)
 			except:
 				print "Something went wrong with assignment of attribute '{0}'.".format(k)
@@ -184,6 +124,42 @@ class Fst8InputWriter(Fst8InputBase):
 
 
 	def execute(self):
+
+		# Copy BeamDyn files if applicable
+		if self.copyBeamDyn == True:
+			if self.fst_vt.ftr_swtchs_flgs.CompElast == 2:
+				print "Copying BeamDyn blade files to running directory\n"
+				bl1_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.input_files.BDBldFile1)
+				bl1_new_dir = os.path.join(self.fst_directory, self.fst_vt.input_files.BDBldFile1)
+				if os.path.isfile(bl1_orig_dir):
+					copyfile(bl1_orig_dir, bl1_new_dir)
+				bl2_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.input_files.BDBldFile2)
+				bl2_new_dir = os.path.join(self.fst_directory, self.fst_vt.input_files.BDBldFile2)
+				if os.path.isfile(bl2_orig_dir):
+					if os.path.isfile(bl2_new_dir) == False:
+						copyfile(bl2_orig_dir, bl2_new_dir)
+				bl3_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.input_files.BDBldFile3)
+				bl3_new_dir = os.path.join(self.fst_directory, self.fst_vt.input_files.BDBldFile3)
+				if os.path.isfile(bl3_orig_dir):
+					if os.path.isfile(bl3_new_dir) == False:
+						copyfile(bl3_orig_dir, bl3_new_dir)
+				print "Copying BeamDyn blade material files to running directory\n"
+				# TODO:BECMAX: BeamDyn blade material files are assumed to be always named according to blade files with added ending 
+				bl1m_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.input_files.BDBldFile1[0:-4] + '_Blade.dat')
+				bl1m_new_dir = os.path.join(self.fst_directory, self.fst_vt.input_files.BDBldFile1[0:-4] + '_Blade.dat')
+				if os.path.isfile(bl1m_orig_dir):
+						copyfile(bl1m_orig_dir, bl1m_new_dir)
+				bl2m_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.input_files.BDBldFile2[0:-4] + '_Blade.dat')
+				bl2m_new_dir = os.path.join(self.fst_directory, self.fst_vt.input_files.BDBldFile2[0:-4] + '_Blade.dat')
+				if os.path.isfile(bl2m_orig_dir):
+					if os.path.isfile(bl2m_new_dir) == False:
+						copyfile(bl2m_orig_dir, bl2m_new_dir)
+				bl3m_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.input_files.BDBldFile3[0:-4] + '_Blade.dat')
+				bl3m_new_dir = os.path.join(self.fst_directory, self.fst_vt.input_files.BDBldFile3[0:-4] + '_Blade.dat')
+				if os.path.isfile(bl3m_orig_dir):
+					if os.path.isfile(bl3m_new_dir) == False:
+						copyfile(bl3m_orig_dir, bl3m_new_dir)
+		
 
 		# Keep simple for now:
 		self.fst_file = os.path.join(self.fst_directory,self.fst_infile)
@@ -239,7 +215,10 @@ class Fst8InputWriter(Fst8InputBase):
 		f.write('{:}\n'.format(self.fst_vt.fst_out_params.SumPrint  )) 
 		f.write('{:.5f}\n'.format(self.fst_vt.fst_out_params.SttsTime  )) 
 		f.write('{:.5f}\n'.format(self.fst_vt.fst_out_params.ChkptTime )) 
-		f.write('{:.5f}\n'.format(self.fst_vt.fst_out_params.DT_Out    )) 
+		try:
+			f.write('{:.5f}\n'.format(self.fst_vt.fst_out_params.DT_Out))
+		except:
+			f.write('"{:}"\n'.format(self.fst_vt.fst_out_params.DT_Out))   
 		f.write('{:.5f}\n'.format(self.fst_vt.fst_out_params.TStart    )) 
 		f.write('{:3}\n'.format(self.fst_vt.fst_out_params.OutFileFmt)) 
 		f.write('{:}\n'.format(self.fst_vt.fst_out_params.TabDelim  )) 
@@ -265,34 +244,46 @@ class Fst8InputWriter(Fst8InputBase):
 		f.close()
 
 		# Call other writers
-		self.ElastoDynWriter()
-		self.BladeStrucWriter()
-		self.TowerWriter()
-		self.InflowWindWriter()
+		if self.writeElasto == True:
+			self.ElastoDynWriter()
+		if self.writeBladeStruc == True:
+			self.BladeStrucWriter()
+		if self.writeTower == True:
+			self.TowerWriter()
+		if self.writeInflow == True:
+			self.InflowWindWriter()
+		
+		# TODO:BECMAX: Do not need to read wind
 		# Wnd wind file if necessary
-		if self.fst_vt.inflow_wind.WindType == 1:
-			#simple wind, no file necessary
-			pass
-		elif self.fst_vt.inflow_wind.WindType == 2:
-			exten = self.fst_vt.uniform_wind_params.Filename.split('.')[1]
-			if exten == "wnd":
-				self.WndWindWriter(self.fst_vt.uniform_wind_params.Filename)
-			else:
-				sys.exit("Wind writer for file extension {} not yet implemented".format(exten))
-		elif self.fst_vt.inflow_wind.WindType == 3:
-			exten = self.fst_vt.turbsim_wind_params.Filename.split('.')[-1]
-			if exten =="wnd":
-				self.WndWindWriter(self.fst_vt.turbsim_wind_params.Filename)
-                        elif exten=="bts": pass # Turbsim made this, we don't need to write it
-			else:
-				sys.exit("Wind writer for file extension {} not yet implemented".format(exten))
-		elif self.fst_vt.inflow_wind.WindType == 4:
-			print "Assuming binary bladed-style FilenameRoot is of type .wnd"
-			self.WndWindWriter("{0}.wnd".format(self.fst_vt.bladed_wind_params.FilenameRoot))
-		else:
-			sys.exit("Reader functionality for wind type {} not yet implemented".format(self.fst_vt.inflow_wind.WindType))
-		self.AeroDynWriter()
-		self.ServoDynWriter()
+		#if self.fst_vt.inflow_wind.WindType == 1:
+		#	#simple wind, no file necessary
+		#	pass
+		#elif self.fst_vt.inflow_wind.WindType == 2:
+		#	exten = self.fst_vt.uniform_wind_params.Filename.split('.')[1]
+		#	if exten == "wnd":
+		#		self.WndWindWriter(self.fst_vt.uniform_wind_params.Filename)
+		#	else:
+		#		sys.exit("Wind writer for file extension {} not yet implemented".format(exten))
+		#elif self.fst_vt.inflow_wind.WindType == 3:
+		#	exten = self.fst_vt.turbsim_wind_params.Filename.split('.')[-1]
+		#	if exten =="wnd":
+		#		self.WndWindWriter(self.fst_vt.turbsim_wind_params.Filename)
+		#                elif exten=="bts": pass # Turbsim made this, we don't need to write it
+		#	else:
+		#		sys.exit("Wind writer for file extension {} not yet implemented".format(exten))
+		#elif self.fst_vt.inflow_wind.WindType == 4:
+		#	print "Assuming binary bladed-style FilenameRoot is of type .wnd"
+		#	self.WndWindWriter("{0}.wnd".format(self.fst_vt.bladed_wind_params.FilenameRoot))
+		#else:
+		#	sys.exit("Reader functionality for wind type {} not yet implemented".format(self.fst_vt.inflow_wind.WindType))
+		
+		if self.writeAero == True:
+			if self.fst_vt.ftr_swtchs_flgs.CompAero == 1:
+				self.AeroDynWriter()
+			elif self.fst_vt.ftr_swtchs_flgs.CompAero == 2:
+				self.AeroDyn15Writer()
+		if self.writeServo == True:
+			self.ServoDynWriter()
 
 
 	def ElastoDynWriter(self):
@@ -307,7 +298,10 @@ class Fst8InputWriter(Fst8InputBase):
 		f.write('---\n')
 		f.write('{:}\n'.format(self.fst_vt.ed_sim_ctrl.Echo  ))
 		f.write('{:3}\n'.format(self.fst_vt.ed_sim_ctrl.Method))
-		f.write('{:.5f}\n'.format(self.fst_vt.ed_sim_ctrl.DT    ))
+		try:
+			f.write('{:.5f}\n'.format(self.fst_vt.ed_sim_ctrl.DT))
+		except:
+			f.write('"{:}"\n'.format(self.fst_vt.ed_sim_ctrl.DT))   
 
 		# Environmental Condition (envir_cond)
 		f.write('---\n')
@@ -781,8 +775,7 @@ class Fst8InputWriter(Fst8InputBase):
 		f.write('{:.1f}\n'.format(self.fst_vt.aerodyn.T_Shad_Refpt))  
 		f.write('{:.3f}\n'.format(self.fst_vt.aerodyn.AirDens))  
 		f.write('{:.9f}\n'.format(self.fst_vt.aerodyn.KinVisc))  
-		f.write('{:2}\n'.format(self.fst_vt.aerodyn.DTAero))        
-
+		f.write('{:}\n'.format(self.fst_vt.aerodyn.DTAero  ))       
 		f.write('{:2}\n'.format(self.fst_vt.blade_aero.NumFoil))
 		for i in range (self.fst_vt.blade_aero.NumFoil):
 			f.write('"{:}"\n'.format(self.fst_vt.blade_aero.FoilNm[i]))
@@ -799,6 +792,167 @@ class Fst8InputWriter(Fst8InputBase):
 			f.write('{:.5f}\t{:.3f}\t{:.4f}\t{:.3f}\t{:5}\t{:}\n'.format(r, t, dr, c, a, p))
 
 		f.close()		
+		
+	def AeroDyn15Writer(self):
+
+		# ======= Airfoil Files ========
+		# copy directory for airfoil files if applicable
+		if self.copyAirfoils == True:
+			print "Copying Airfoils folder to running directory\n"
+			if os.path.isdir(os.path.join(self.fst_masterdir,'Airfoils')):
+				if not os.path.isdir(os.path.join(self.fst_directory,'Airfoils')):
+					copy_tree(os.path.join(self.fst_masterdir,'Airfoils'),os.path.join(self.fst_directory,'Airfoils'))
+
+		# copy airfoils manually
+		# Limitation: cannot copy coords as no acces, thus copy entire Airfoils dir for now
+		#for i in range(self.fst_vt.blade_aero15.NumAFfiles):	 
+		#	print "Copying Airfoils to running directory\n"
+		#	af_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.blade_aero15.AFNames[i])
+		#	af_new_dir = os.path.join(self.fst_directory, self.fst_vt.blade_aero15.AFNames[i])
+		#	print af_orig_dir
+		#	print af_new_dir
+		#	copyfile(af_orig_dir, af_new_dir)
+		
+			
+		# copy aerodyn blade files if applicable
+		
+		if self.copyAeroBlade == True:
+			print "Copying Aerodyn Blade files to running directory\n"
+			bl1_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.aerodyn15.ADBlFile1)
+			bl1_new_dir = os.path.join(self.fst_directory, self.fst_vt.aerodyn15.ADBlFile1)
+			if os.path.isfile(bl1_orig_dir):
+				copyfile(bl1_orig_dir, bl1_new_dir)
+			bl2_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.aerodyn15.ADBlFile2)
+			bl2_new_dir = os.path.join(self.fst_directory, self.fst_vt.aerodyn15.ADBlFile2)
+			if os.path.isfile(bl2_orig_dir):
+				if os.path.isfile(bl2_new_dir) == False:
+					copyfile(bl2_orig_dir, bl2_new_dir)
+			bl3_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.aerodyn15.ADBlFile3)
+			bl3_new_dir = os.path.join(self.fst_directory, self.fst_vt.aerodyn15.ADBlFile3)
+			if os.path.isfile(bl3_orig_dir):
+				if os.path.isfile(bl3_new_dir) == False:
+					copyfile(bl3_orig_dir, bl3_new_dir)
+
+
+		ad_file = os.path.join(self.fst_directory,self.fst_vt.input_files.AeroFile)
+		f = open(ad_file,'w')
+		
+		# AeroDyn file header (aerodyn)
+		f.write('---\n')
+		f.write('---\n')
+		f.write('---\n')
+		
+		# General Options
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.Echo  ))
+		try:
+			f.write('{:.5f}\n'.format(self.fst_vt.aerodyn15.DTAero))
+		except:
+			f.write('"{:}"\n'.format(self.fst_vt.aerodyn15.DTAero))     
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.WakeMod  ))
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.AFAeroMod  ))
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.TwrPotent  ))
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.TwrShadow  ))
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.TwrAero  ))
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.FrozenWake  ))
+		if self.FSTexe == 'openfast':
+			f.write('{:}\n'.format(self.fst_vt.aerodyn15.CavitCheck  ))
+		f.write('---\n')
+		
+		# Environmental Conditions 
+		f.write('{:.5f}\n'.format(self.fst_vt.aerodyn15.AirDens  ))
+		f.write('{:.9f}\n'.format(self.fst_vt.aerodyn15.KinVisc  ))
+		f.write('{:.5f}\n'.format(self.fst_vt.aerodyn15.SpdSound  ))
+		if self.FSTexe == 'openfast':
+			f.write('{:.5f}\n'.format(self.fst_vt.aerodyn15.Patm  ))
+			f.write('{:.5f}\n'.format(self.fst_vt.aerodyn15.Pvap  ))
+			f.write('{:.5f}\n'.format(self.fst_vt.aerodyn15.FluidDepth  ))
+		f.write('---\n')
+		
+		# Blade-Element/Momentum Theory Options
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.SkewMod  ))
+		if self.FSTexe == 'openfast':
+			try:
+				f.write('{:}\n'.format(self.fst_vt.aerodyn15.SkewModFactor  ))
+			except:
+				f.write('"{:}"\n'.format(self.fst_vt.aerodyn15.SkewModFactor )) 
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.TipLoss  ))
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.HubLoss  ))
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.TanInd  ))
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.AIDrag  ))
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.TIDrag  ))
+		try:
+			f.write('{:}\n'.format(self.fst_vt.aerodyn15.IndToler  ))
+		except:
+			f.write('"{:}"\n'.format(self.fst_vt.aerodyn15.IndToler))  
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.MaxIter  ))
+		f.write('---\n')
+
+		# Dynamic Blade-Element/Momentum Theory Options
+		if self.FSTexe == 'openfast':
+			f.write('{:3}\n'.format(self.fst_vt.aerodyn15.DBEMT_Mod  ))
+			f.write('{:.5f}\n'.format(self.fst_vt.aerodyn15.tau1_const  ))
+			f.write('---\n')
+			
+		# Beddoes-Leishman Unsteady Airfoil Aerodynamics Options
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.UAMod  ))
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.FLookup  ))
+		f.write('---\n')
+	
+		# Airfoil Information
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.InCol_Alfa  ))
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.InCol_Cl  ))
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.InCol_Cd  ))
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.InCol_Cm  ))
+		f.write('{:3}\n'.format(self.fst_vt.aerodyn15.InCol_Cpmin  ))	
+		f.write('{:2}\n'.format(self.fst_vt.blade_aero15.NumAFfiles))
+		for i in range (self.fst_vt.blade_aero15.NumAFfiles):
+			f.write('"{:}"\n'.format(self.fst_vt.blade_aero15.AFNames[i]))
+		f.write('---\n')
+		
+		# Rotor/Blade Properties
+		f.write('{:}\n'.format(self.fst_vt.aerodyn15.UseBlCm  ))
+		f.write('"{:}"\n'.format(self.fst_vt.aerodyn15.ADBlFile1  ))
+		f.write('"{:}"\n'.format(self.fst_vt.aerodyn15.ADBlFile2  ))
+		f.write('"{:}"\n'.format(self.fst_vt.aerodyn15.ADBlFile3  ))
+		f.write('---\n')
+		
+		# Tower Influence and Aerodynamics (tower_aero15)
+		f.write('{:2}\n'.format(self.fst_vt.tower_aero15.NumTwrNds))
+		twrelev = self.fst_vt.tower_aero15.TwrElev
+		twrdiam = self.fst_vt.tower_aero15.TwrDiam
+		twrcd = self.fst_vt.tower_aero15.TwrCd
+		f.write('TwrElev  TwrDiam  TwrCd\n')
+		f.write('(m)      (m)	   (m)\n')
+		for e, d, c in zip(twrelev, twrdiam, twrcd):
+			f.write('{:.5f}\t{:.5f}\t{:.5f}\n'.format(e, d, c))
+		f.write('---\n')
+		
+		# Aerodyn15 Output Params (ad15_out_params)
+		f.write('{:}\n'.format(self.fst_vt.ad15_out_params.SumPrint))
+		f.write('{:3}\n'.format(self.fst_vt.ad15_out_params.NBlOuts))
+		for i in range(self.fst_vt.ad15_out_params.NBlOuts-1):
+			f.write('{:3}, '.format(self.fst_vt.ad15_out_params.BlOutNd[i]))
+		f.write('{:3}\n'.format(self.fst_vt.ad15_out_params.BlOutNd[-1]))
+		f.write('{:3}\n'.format(self.fst_vt.ad15_out_params.NTwOuts))
+		for i in range(self.fst_vt.ad15_out_params.NTwOuts-1):
+			f.write('{:3}, '.format(self.fst_vt.ad15_out_params.TwOutNd[i]))
+		f.write('{:3}\n'.format(self.fst_vt.ad15_out_params.TwOutNd[-1]))
+		
+		#TODO:BECMAX: add outlist
+		f.write('OutList\n')
+		out_list = []
+		for i in self.fst_vt.outlist.aerodyn15_vt.__dict__.keys():
+			if self.fst_vt.outlist.aerodyn15_vt.__dict__[i] == True:
+				out_list.append(i)
+		f.write('"')
+		for i in range(len(out_list)):
+			if out_list[i][0] != '_':
+				f.write('{:}, '.format(out_list[i]))
+		f.write('"\n')
+		f.write('END\n')
+		
+		f.close()		
+
 
 
 
@@ -883,6 +1037,38 @@ class Fst8InputWriter(Fst8InputBase):
 
 
 	def ServoDynWriter(self):
+		
+		# ======= ServoData Files ========
+		# make directory for servodyn files if applicable
+		if self.copyDLL == True:
+			if os.path.isdir(os.path.join(self.fst_masterdir,'ServoData')):
+				if not os.path.isdir(os.path.join(self.fst_directory,'ServoData')):
+					os.mkdir(os.path.join(self.fst_directory,'ServoData'))
+			# copy .dll if applicable
+			print "Copying Controller files (.dll...) to running directory\n"
+			dll_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.bladed_interface.DLL_FileName)
+			dll_new_dir = os.path.join(self.fst_directory, self.fst_vt.bladed_interface.DLL_FileName)
+			if os.path.isfile(dll_orig_dir):
+				copyfile(dll_orig_dir, dll_new_dir)
+			
+		if self.copyDLLinfile == True:
+			# copy .dll infile if applicable
+			dllIN_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.bladed_interface.DLL_InFile)
+			dllIN_new_dir = os.path.join(self.fst_directory, self.fst_vt.bladed_interface.DLL_InFile)
+			if os.path.isfile(dllIN_orig_dir):
+				copyfile(dllIN_orig_dir, dllIN_new_dir)
+		
+		if self.copyTMDamp == True:
+			# copy tuned mass damper files if applicable
+			NTMD_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.tuned_mass_damper.NTMDfile)
+			NTMD_new_dir = os.path.join(self.fst_directory, self.fst_vt.tuned_mass_damper.NTMDfile)
+			if os.path.isfile(NTMD_orig_dir):
+				copyfile(NTMD_orig_dir, NTMD_new_dir)
+			TTMD_orig_dir = os.path.join(self.fst_masterdir, self.fst_vt.tuned_mass_damper.TTMDfile)
+			TTMD_new_dir = os.path.join(self.fst_directory, self.fst_vt.tuned_mass_damper.TTMDfile)
+			if os.path.isfile(TTMD_orig_dir):
+				copyfile(TTMD_orig_dir, TTMD_new_dir)
+
 
 		sd_file = os.path.join(self.fst_directory,self.fst_vt.input_files.ServoFile)
 		f = open(sd_file,'w')
@@ -893,7 +1079,10 @@ class Fst8InputWriter(Fst8InputBase):
 		# ServoDyn Simulation Control (sd_sim_ctrl)
 		f.write('---\n')
 		f.write('{:}\n'.format(self.fst_vt.sd_sim_ctrl.Echo))
-		f.write('{:.5f}\n'.format(self.fst_vt.sd_sim_ctrl.DT))
+		try:
+			f.write('{:.5f}\n'.format(self.fst_vt.sd_sim_ctrl.DT))
+		except:
+			f.write('"{:}"\n'.format(self.fst_vt.sd_sim_ctrl.DT)) 
 
 		# Pitch Control (pitch_ctrl)
 		f.write('---\n')

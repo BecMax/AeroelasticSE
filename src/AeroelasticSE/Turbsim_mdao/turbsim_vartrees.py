@@ -12,82 +12,84 @@ import numpy as np
 class runtime_options(object):
     def __init__(self):
          self.echo = False
-         self.RandSeed1 = np.random.uniform(1, 1e8)
-         self.RandSeed2 = '"RANLUX"'
+         self.RandSeed1 = 0
+         self.RandSeed2 = ''
          self.WrBHHTP = False
          self.WrFHHTP = False
          self.WrADHH = False
-         self.WrADFF = True
+         self.WrADFF = False
          self.WrBLFF = False
          self.WrADTWR = False
          self.WrFMTFF = False
          self.WrACT = False
-         self.Clockwise = True
+         self.Clockwise = False
          self.ScaleIEC = 0
 
 # Turbine/Model Specifications
 class tmspecs(object):
     def __init__(self):
-         self.NumGrid_Z = 30
-         self.NumGrid_Y = 30
-         self.TimeStep = 0.05
-         self.AnalysisTime = 630
-         self.UsableTime = '"ALL"'
-         self.HubHt = 90
-         self.GridHeight = 138
-         self.GridWidth = 138
-         self.VFlowAng = 0
-         self.HFlowAng = 0
+         self.NumGrid_Z = 0
+         self.NumGrid_Y = 0
+         self.TimeStep = 0.0
+         self.AnalysisTime = 0.0
+         self.UsableTime = ''
+         self.HubHt = 0.0
+         self.GridHeight = 0.0
+         self.GridWidth = 0.0
+         self.VFlowAng = 0.0
+         self.HFlowAng = 0.0
 
 # Meteorological Boundary Conditions
 class metboundconds(object):
     def __init__(self):
-         self.TurbModel = '"USRINP"'
-         self.UserFile = 'turbulence_user.inp'
-         self.IECstandard = '"1-ED3"'
-         self.IECturbc = '"B"'
-         self.IEC_WindType = '"NTM"'
-         self.ETMc = '"default"'
-         self.WindProfileType = '"USR"'
-         self.ProfileFile = 'shear.profile'
-         self.RefHt = 90
-         self.URef = 12
-         self.ZJetMax = '"default"'
-         self.PLExp = '"default"'
-         self.Z0 = '"default"'
+         self.TurbModel = ''
+         self.UserFile = ''
+         self.IECstandard = ''
+         self.IECturbc = ''
+         self.IEC_WindType = ''
+         self.IEC_Vave = ''
+         self.IEC_Vref = ''
+         self.ETMc = ''
+         self.WindProfileType = ''
+         self.ProfileFile = ''
+         self.RefHt = 0.0
+         self.URef = 0.0
+         self.ZJetMax = ''
+         self.PLExp = ''
+         self.Z0 = ''
 
 # Non-IEC Meteorological Boundary Conditions
 class noniecboundconds(object):
     def __init__(self):
-         self.Latitude = '"default"'
-         self.RICH_NO = 0
-         self.UStar = '"default"'
-         self.ZI = '"default"'
-         self.PC_UW = -0.85
-         self.PC_UV = 0.15
-         self.PC_VW = -0.1
+         self.Latitude = ''
+         self.RICH_NO = 0.0
+         self.UStar = ''
+         self.ZI = ''
+         self.PC_UW = 0.0
+         self.PC_UV = 0.0
+         self.PC_VW = 0.0
 
 # Spatial Coherence Parameters
 class spatialcoherance(object):
     def __init__(self):
-         self.SCMod1 = '"GENERAL"'
-         self.SCMod2 = '"GENERAL"'
-         self.SCMod3 = '"GENERAL"'
-         self.InCDec1 = [13.75, 0.04]
-         self.InCDec2 = [9.85, 0.0015]
-         self.InCDec3 = [9.5, 0.003]
-         self.CohExp = 0.5
+         self.SCMod1 = ''
+         self.SCMod2 = ''
+         self.SCMod3 = ''
+         self.InCDec1 = [0.0, 0.0]
+         self.InCDec2 = [0.0, 0.0]
+         self.InCDec3 = [0.0, 0.0]
+         self.CohExp = 0.0
 
 # Coherent Turbulence Scaling Parameters
 class coherentTurbulence(object):
     def __init__(self):
-         self.CTEventPath = '"Y:\Wind\Archive\Public\Projects\KH_Billow\EventData"'
-         self.CTEventFile = '"Random"'
-         self.Randomize = True
-         self.DistScl = 1
-         self.CTLy = 0.5
-         self.CTLz = 0.5
-         self.CTStartTime = 30
+         self.CTEventPath = ''
+         self.CTEventFile = ''
+         self.Randomize = False
+         self.DistScl = 0.0
+         self.CTLy = 0.0
+         self.CTLz = 0.0
+         self.CTStartTime = 0.0
 
 class turbsiminputs(object):
     def __init__(self):

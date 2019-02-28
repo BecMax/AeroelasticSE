@@ -1,4 +1,5 @@
 # Output Channel Variable Trees
+from FST_vartrees_AD15_out import AeroDyn15Out
 
 class WindMotionsOut(object):
     def __init__(self):
@@ -1236,9 +1237,42 @@ class DOFOut(object):
         self.QD2_Y = False   #Acceleration of platform yaw rotation DOF () , () units= rad/s**2
 
 
-# class InflowWindOut(object):
-#     def __init__(self):
-# NO FAST OUTPUTS DEFINED FOR THIS YET
+class InflowWindOut(object):
+    def __init__(self):
+
+        self.Wind1VelX = False   #X component of wind at user selected wind point 1
+        self.Wind1VelY = False   #Y component of wind at user selected wind point 1
+        self.Wind1VelZ = False   #Z component of wind at user selected wind point 1
+        self.Wind2VelX = False   #X component of wind at user selected wind point 2
+        self.Wind2VelY = False   #Y component of wind at user selected wind point 2
+        self.Wind2VelZ = False   #Z component of wind at user selected wind point 2
+        self.Wind3VelX = False   #X component of wind at user selected wind point 3
+        self.Wind3VelY = False   #Y component of wind at user selected wind point 3
+        self.Wind3VelZ = False   #Z component of wind at user selected wind point 3
+        self.Wind4VelX = False   #X component of wind at user selected wind point 4
+        self.Wind4VelY = False   #Y component of wind at user selected wind point 4
+        self.Wind4VelZ = False   #Z component of wind at user selected wind point 4
+        self.Wind5VelX = False   #X component of wind at user selected wind point 5
+        self.Wind5VelY = False   #Y component of wind at user selected wind point 5
+        self.Wind5VelZ = False   #Z component of wind at user selected wind point 5
+        self.Wind6VelX = False   #X component of wind at user selected wind point 6
+        self.Wind6VelY = False   #Y component of wind at user selected wind point 6
+        self.Wind6VelZ = False   #Z component of wind at user selected wind point 6
+        self.Wind7VelX = False   #X component of wind at user selected wind point 7
+        self.Wind7VelY = False   #Y component of wind at user selected wind point 7
+        self.Wind7VelZ = False   #Z component of wind at user selected wind point 7
+        self.Wind8VelX = False   #X component of wind at user selected wind point 8
+        self.Wind8VelY = False   #Y component of wind at user selected wind point 8
+        self.Wind8VelZ = False   #Z component of wind at user selected wind point 8
+        self.Wind9VelX = False   #X component of wind at user selected wind point 9
+        self.Wind9VelY = False   #Y component of wind at user selected wind point 9
+        self.Wind9VelZ = False   #Z component of wind at user selected wind point 9
+        self.WindMeas1 = False   #Wind measurement at sensor 1
+        self.WindMeas2 = False   #Wind measurement at sensor 2
+        self.WindMeas3 = False   #Wind measurement at sensor 3
+        self.WindMeas4 = False   #Wind measurement at sensor 4
+        self.WindMeas5 = False   #Wind measurement at sensor 5
+
 
 class ServoDynOut(object):
     def __init__(self):
@@ -1257,6 +1291,7 @@ class ServoDynOut(object):
         self.TTMD_XQD = False   #Tower X TMD velocity
         self.TTMD_YQ = False   #Tower Y TMD position (displacement)
         self.TTMD_YQD = False   #Tower Y TMD velocity
+        
 
 
 # Output Variable Tree
@@ -1275,9 +1310,15 @@ class FstOutput(object):
         self.blade_loads_vt = BladeLoadsOut()   #blade loads output channels 
         self.hub_nacelle_loads_vt = HubNacelleLoadsOut()   #hub and nacelle system loads output channels
         self.tower_support_loads_vt = TowerSupportLoadsOut()   #tower and support loads output channels
-
+        
+        # AeroDyn15 output channels
+        self.aerodyn15_vt = AeroDyn15Out()
+        
         # ServoDyn output channels
         self.servodyn_vt = ServoDynOut()
+        
+        # Inflowwind output channels
+        self.inflow_wind_vt = InflowWindOut()
 
         # Other output channels
         self.dof_vt = DOFOut()   #degree of freedom output channels

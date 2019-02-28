@@ -18,7 +18,7 @@ class Fst8Wrapper(Fst8ExternalCode):
         super(Fst8Wrapper, self).__init__()
 
         self.FSTexe = None   #Path to executable
-        self.libmap = None   #Path to libmap library
+        #self.libmap = None   #Path to libmap library
         self.FSTInputFile = None   #FAST input file (ext=.fst)
         self.fst_directory = None   #Path to fst directory files
 

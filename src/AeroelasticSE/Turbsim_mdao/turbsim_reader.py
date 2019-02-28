@@ -1,10 +1,17 @@
 from turbsim_vartrees import turbsiminputs
+import os
 
 class turbsimReader(object):
     def __init__(self):
         self.turbsim_vt = turbsiminputs()
-    def read_input_file(self, input_file_name):
-        inpf = open(input_file_name, 'r')
+        self.Turbsim_masterfile = ''
+        self.Turbsim_masterdir = ''
+        
+    def execute(self):
+        self.read_input_file()
+          
+    def read_input_file(self):
+        inpf = open(os.path.join(self.Turbsim_masterdir, self.Turbsim_masterfile), 'r')
 
         # Runtime Options
         inpf.readline()
@@ -46,6 +53,8 @@ class turbsimReader(object):
         self.turbsim_vt.metboundconds.IECstandard = inpf.readline().split()[0]
         self.turbsim_vt.metboundconds.IECturbc = inpf.readline().split()[0]
         self.turbsim_vt.metboundconds.IEC_WindType = inpf.readline().split()[0]
+        self.turbsim_vt.metboundconds.IEC_Vav = inpf.readline().split()[0]
+        self.turbsim_vt.metboundconds.IEC_Vref = inpf.readline().split()[0]
         self.turbsim_vt.metboundconds.ETMc = inpf.readline().split()[0]
         self.turbsim_vt.metboundconds.WindProfileType = inpf.readline().split()[0]
         self.turbsim_vt.metboundconds.ProfileFile = inpf.readline().split()[0]
@@ -56,7 +65,7 @@ class turbsimReader(object):
         self.turbsim_vt.metboundconds.Z0 = inpf.readline().split()[0]
 
 
-        # Meteorological Boundary Conditions 
+        # Non-IEC Meteorological Boundary Conditions 
         inpf.readline()
         inpf.readline()
         self.turbsim_vt.noniecboundconds.Latitude = inpf.readline().split()[0]
@@ -90,5 +99,6 @@ class turbsimReader(object):
         self.turbsim_vt.coherentTurbulence.CTStartTime = inpf.readline().split()[0]
 
 if __name__=='__main__':
-    reader = turbsimReader()
-    reader.read_input_file('turbsim_default.in')
+    
+    pass
+

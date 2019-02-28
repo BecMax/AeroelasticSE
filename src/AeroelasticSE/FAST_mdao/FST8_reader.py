@@ -1,7 +1,7 @@
 import os,re
 import sys
 
-from FST_vartrees_new import FstModel, ADAirfoil, ADAirfoilPolar
+from FST_vartrees_new import FstModel, ADAirfoil, ADAirfoilPolar, AD15Airfoil, AD15AirfoilPolar
 
 def fix_path(name):
     """ split a path, then reconstruct it using os.path.join """
@@ -21,7 +21,17 @@ class Fst8InputReader(Fst8InputBase):
 
         self.fst_infile = ''   #Master FAST file
         self.fst_directory = ''   #Directory of master FAST file set
-        self.ad_file_type = 0   #Enum(0, (0,1), desc='Aerodyn file type, 0=old Aerodyn, 1 = new Aerdyn')
+        self.ad_file_type = 0   #Enum(0, (0,1), desc='Aerodyn file type, 0=old Aerodyn, 1 = new Aerdyn')  # probably related to ADv14
+        self.FSTexe = None   #Path to executable
+        
+        self.passToNumpy = False
+        self.writeElasto = False
+        self.writeBladeStruc = False
+        self.writeTower = False
+        self.writeInflow = False
+        self.writeAero = False
+        self.writeServo = False
+        
         
         # This currently doesn't mean anything for FAST8
         # self.fst_file_type = 0   #Enum(0, (0,1), desc='Fst file type, 0=old FAST, 1 = new FAST')    
@@ -90,7 +100,11 @@ class Fst8InputReader(Fst8InputBase):
             self.fst_vt.fst_out_params.SumPrint = True
         self.fst_vt.fst_out_params.SttsTime = float(f.readline().split()[0])
         self.fst_vt.fst_out_params.ChkptTime = float(f.readline().split()[0])
-        self.fst_vt.fst_out_params.DT_Out = float(f.readline().split()[0])
+        DT_line = f.readline().split()[0]
+        try:
+            self.fst_vt.fst_out_params.DT_Out = float(DT_line)
+        except:
+            self.fst_vt.fst_out_params.DT_Out = DT_line[1:-1]
         self.fst_vt.fst_out_params.TStart = float(f.readline().split()[0])
         self.fst_vt.fst_out_params.OutFileFmt = int(f.readline().split()[0])
         boolflag = f.readline().split()[0]
@@ -121,33 +135,57 @@ class Fst8InputReader(Fst8InputBase):
             self.fst_vt.visualization.VTK_fields = True
         self.fst_vt.visualization.VTK_fps = float(f.readline().split()[0])
 
-        self.ElastoDynReader()
-        self.BladeStrucReader()
-        self.TowerReader()
-        self.InflowWindReader()
-        # Wnd wind file if necessary
-        if self.fst_vt.inflow_wind.WindType == 1:
-            #simple wind, no file necessary
-            pass
-        elif self.fst_vt.inflow_wind.WindType == 2:
-            exten = self.fst_vt.uniform_wind_params.Filename.split('.')[1]
-            if exten == "wnd":
-                self.WndWindReader(self.fst_vt.uniform_wind_params.Filename)
-            else:
-                sys.exit("Wind reader for file extension {} not yet implemented".format(exten))
-        elif self.fst_vt.inflow_wind.WindType == 3:
-            exten = self.fst_vt.turbsim_wind_params.Filename.split('.')[1]
-            if exten == "wnd":
-                self.WndWindReader(self.fst_vt.turbsim_wind_params.Filename)
-            else:
-                sys.exit("Wind reader for file extension {} not yet implemented".format(exten))
-        elif self.fst_vt.inflow_wind.WindType == 4:
-            print "Assuming binary bladed-style FilenameRoot is of type .wnd"
-            self.WndWindReader("{0}.wnd".format(self.fst_vt.bladed_wind_params.FilenameRoot))
+        # Only deactivate readers if output should not be passed to numpy arrays
+        if self.passToNumpy == False:
+            if self.writeElasto == True:
+                self.ElastoDynReader()
+            if self.writeBladeStruc == True:    
+                self.BladeStrucReader()
+            if self.writeTower == True:     
+                self.TowerReader()
+            if self.writeInflow == True:
+                self.InflowWindReader()
+            if self.writeAero == True:
+                if self.fst_vt.ftr_swtchs_flgs.CompAero == 1:
+                    self.AeroDynReader()
+                elif self.fst_vt.ftr_swtchs_flgs.CompAero == 2:
+                    self.AeroDyn15Reader()
+            if self.writeServo == True:
+                self.ServoDynReader()
         else:
-            sys.exit("Reader functionality for wind type {} not yet implemented".format(self.fst_vt.inflow_wind.WindType))
-        self.AeroDynReader()
-        self.ServoDynReader()
+            self.ElastoDynReader()
+            self.BladeStrucReader()
+            self.TowerReader()
+            self.InflowWindReader()
+            if self.fst_vt.ftr_swtchs_flgs.CompAero == 1:
+                self.AeroDynReader()
+            elif self.fst_vt.ftr_swtchs_flgs.CompAero == 2:
+                self.AeroDyn15Reader()
+            self.ServoDynReader()
+            
+        # Wnd wind file if necessary
+        # TODO:BECMAX: Do not need to read wind
+        #if self.fst_vt.inflow_wind.WindType == 1:
+        #    #simple wind, no file necessary
+        #    pass
+        #elif self.fst_vt.inflow_wind.WindType == 2:
+        #    exten = self.fst_vt.uniform_wind_params.Filename.split('.')[1]
+        #    if exten == "wnd":
+        #        self.WndWindReader(self.fst_vt.uniform_wind_params.Filename)
+        #    else:
+        #        sys.exit("Wind reader for file extension {} not yet implemented".format(exten))
+        #elif self.fst_vt.inflow_wind.WindType == 3:
+        #    exten = self.fst_vt.turbsim_wind_params.Filename.split('.')[1]
+        #    if exten == "wnd":
+        #        self.WndWindReader(self.fst_vt.turbsim_wind_params.Filename)
+        #    else:
+        #        sys.exit("Wind reader for file extension {} not yet implemented".format(exten))
+        #elif self.fst_vt.inflow_wind.WindType == 4:
+        #    print "Assuming binary bladed-style FilenameRoot is of type .wnd"
+        #    self.WndWindReader("{0}.wnd".format(self.fst_vt.bladed_wind_params.FilenameRoot))
+        #else:
+        #    sys.exit("Reader functionality for wind type {} not yet implemented".format(self.fst_vt.inflow_wind.WindType))
+
 
     def ElastoDynReader(self):
 
@@ -165,7 +203,11 @@ class Fst8InputReader(Fst8InputBase):
         else:
             self.fst_vt.ed_sim_ctrl.Echo = True
         self.fst_vt.ed_sim_ctrl.Method  = int(f.readline().split()[0])
-        self.fst_vt.ed_sim_ctrl.DT = float(f.readline().split()[0])
+        DT_line = f.readline().split()[0]
+        try:
+            self.fst_vt.ed_sim_ctrl.DT = float(DT_line)
+        except:
+            self.fst_vt.ed_sim_ctrl.DT = DT_line[1:-1]
 
         # Environmental Condition (envir_cond)
         f.readline()
@@ -683,16 +725,16 @@ class Fst8InputReader(Fst8InputBase):
             self.fst_vt.inflow_out_params.SumPrint = True
         
         # NO INFLOW WIND OUTPUT PARAMETERS YET DEFINED IN FAST
-        # f.readline()
-        # data = f.readline()
-        # while data.split()[0] != 'END':
-        #     channels = data.split('"')
-        #     channel_list = channels[1].split(',')
-        #     for i in range(len(channel_list)):
-        #         channel_list[i] = channel_list[i].replace(' ','')
-        #         if channel_list[i] in self.fst_vt.outlist.inflow_wind_vt.__dict__.keys():
-        #             self.fst_vt.outlist.inflow_wind_vt.__dict__[channel_list[i]] = True
-        #     data = f.readline()
+        f.readline()
+        data = f.readline()
+        while data.split()[0] != 'END':
+            channels = data.split('"')
+            channel_list = channels[1].split(',')
+            for i in range(len(channel_list)):
+                channel_list[i] = channel_list[i].replace(' ','')
+                if channel_list[i] in self.fst_vt.outlist.inflow_wind_vt.__dict__.keys():
+                    self.fst_vt.outlist.inflow_wind_vt.__dict__[channel_list[i]] = True
+            data = f.readline()
 
         f.close()
 
@@ -735,6 +777,8 @@ class Fst8InputReader(Fst8InputBase):
 
 
     def AeroDynReader(self):
+        
+        # TODO:BECMAX aerodyn14 reader seems outdated compare aerodyn14 input files
 
         #from airfoil import PolarByRe # only if creating airfoil variable trees
 
@@ -789,7 +833,299 @@ class Fst8InputReader(Fst8InputBase):
         # create airfoil objects
         for i in range(self.fst_vt.blade_aero.NumFoil):
              self.fst_vt.blade_aero.af_data.append(self.initFromAerodynFile(os.path.join(self.fst_directory,self.fst_vt.blade_aero.FoilNm[i]), self.ad_file_type))
+             
+    def AeroDyn15Reader(self):
 
+        #from airfoil import PolarByRe # only if creating airfoil variable trees
+
+        ad_file15 = os.path.join(self.fst_directory, self.fst_vt.input_files.AeroFile)
+        f = open(ad_file15)
+
+        # AeroDyn file header (aerodyn)
+        f.readline()
+        f.readline()
+        f.readline()
+        
+        # General Options
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.Echo = False
+        else:
+            self.fst_vt.aerodyn15.Echo = True
+        DTAero_line = f.readline().split()[0]
+        try:
+            self.fst_vt.aerodyn15.DTAero = float(DTAero_line)
+        except:
+            self.fst_vt.aerodyn15.DTAero = DTAero_line[1:-1]
+        self.fst_vt.aerodyn15.WakeMod = int(f.readline().split()[0])
+        self.fst_vt.aerodyn15.AFAeroMod = int(f.readline().split()[0])
+        self.fst_vt.aerodyn15.TwrPotent = int(f.readline().split()[0])
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.TwrShadow = False
+        else:
+            self.fst_vt.aerodyn15.TwrShadow = True
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.TwrAero = False
+        else:
+            self.fst_vt.aerodyn15.TwrAero = True    
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.FrozenWake = False
+        else:
+            self.fst_vt.aerodyn15.CavitCheck = True   
+        if self.FSTexe == 'openfast':
+            boolflag = f.readline().split()[0]
+            if boolflag == 'False':
+                self.fst_vt.aerodyn15.CavityCheck = False
+            else:
+                self.fst_vt.aerodyn15.CavityCheck = True	
+        f.readline()
+        
+        # Environmental Conditions 
+        self.fst_vt.aerodyn15.AirDens = float(f.readline().split()[0])
+        self.fst_vt.aerodyn15.KinVisc = float(f.readline().split()[0])
+        self.fst_vt.aerodyn15.SpdSound = float(f.readline().split()[0])
+        if self.FSTexe == 'openfast':
+            self.fst_vt.aerodyn15.Patm = float(f.readline().split()[0])
+            self.fst_vt.aerodyn15.Pvap = float(f.readline().split()[0])
+            self.fst_vt.aerodyn15.FluidDepth = float(f.readline().split()[0])
+        f.readline()
+        
+        # Blade-Element/Momentum Theory Options
+        self.fst_vt.aerodyn15.SkewMod = int(f.readline().split()[0])
+        if self.FSTexe == 'openfast':
+            SkewModFactor_line = f.readline().split()[0]
+            try:
+                self.fst_vt.aerodyn15.SkewModFactor = float(SkewModFactor_line)
+            except:
+                self.fst_vt.aerodyn15.SkewModFactor = SkewModFactor_line[1:-1]
+
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.TipLoss = False
+        else:
+            self.fst_vt.aerodyn15.TipLoss = True 
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.HubLoss = False
+        else:
+            self.fst_vt.aerodyn15.HubLoss = True 
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.TanInd = False
+        else:
+            self.fst_vt.aerodyn15.TanInd = True 
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.AIDrag = False
+        else:
+            self.fst_vt.aerodyn15.AIDrag = True 
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.TIDrag = False
+        else:
+            self.fst_vt.aerodyn15.TIDrag = True 
+        IndToler_line = f.readline().split()[0]
+        try:
+            self.fst_vt.aerodyn15.IndToler = float(IndToler_line)
+        except:
+            self.fst_vt.aerodyn15.IndToler = IndToler_line[1:-1]
+        self.fst_vt.aerodyn15.MaxIter = int(f.readline().split()[0])
+        f.readline()
+        
+        # Dynamic Blade-Element/Momentum Theory Options
+        if self.FSTexe == 'openfast':
+            self.DBEMT_Mod = int(f.readline().split()[0])
+            self.tau1_const = float(f.readline().split()[0])
+            f.readline()
+
+        # Beddoes-Leishman Unsteady Airfoil Aerodynamics Options
+        self.fst_vt.aerodyn15.UAMod = int(f.readline().split()[0])
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.FLookup = False
+        else:
+            self.fst_vt.aerodyn15.FLookup = True
+        f.readline()
+    
+        # Airfoil Information
+        self.fst_vt.aerodyn15.InCol_Alfa = int(f.readline().split()[0])
+        self.fst_vt.aerodyn15.InCol_Cl = int(f.readline().split()[0])
+        self.fst_vt.aerodyn15.InCol_Cd = int(f.readline().split()[0])
+        self.fst_vt.aerodyn15.InCol_Cm = int(f.readline().split()[0])
+        self.fst_vt.aerodyn15.InCol_Cpmin = int(f.readline().split()[0])
+        self.fst_vt.blade_aero15.NumAFfiles = int(f.readline().split()[0])
+        self.fst_vt.blade_aero15.AFNames = [None] * self.fst_vt.blade_aero15.NumAFfiles
+        for i in range(self.fst_vt.blade_aero15.NumAFfiles):
+            af_filename15 = f.readline().split()[0]
+            af_filename15 = fix_path(af_filename15)
+            # print af_filename
+            self.fst_vt.blade_aero15.AFNames[i] = af_filename15[1:-1]
+        f.readline()
+            
+        # Rotor/Blade Properties
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.aerodyn15.UseBlCm = False
+        else:
+            self.fst_vt.aerodyn15.UseBlCm = True
+        self.fst_vt.aerodyn15.ADBlFile1 = fix_path(f.readline().split()[0])[1:-1]
+        self.fst_vt.aerodyn15.ADBlFile2 = fix_path(f.readline().split()[0])[1:-1]
+        self.fst_vt.aerodyn15.ADBlFile3 = fix_path(f.readline().split()[0])[1:-1]
+        f.readline()
+
+        # Tower Influence and Aerodynamics (tower_aero15)
+        self.fst_vt.tower_aero15.NumTwrNds = int(f.readline().split()[0])
+        f.readline()
+        f.readline()
+        self.fst_vt.tower_aero15.TwrElev = [None] * self.fst_vt.tower_aero15.NumTwrNds
+        self.fst_vt.tower_aero15.TwrDiam = [None] * self.fst_vt.tower_aero15.NumTwrNds
+        self.fst_vt.tower_aero15.TwrCd = [None] * self.fst_vt.tower_aero15.NumTwrNds
+        for i in range(self.fst_vt.tower_aero15.NumTwrNds):
+            data = f.readline().split()
+            self.fst_vt.tower_aero15.TwrElev[i] = float(data[0])
+            self.fst_vt.tower_aero15.TwrDiam[i] = float(data[1])
+            self.fst_vt.tower_aero15.TwrCd[i] = float(data[2])
+        f.readline()
+        
+        # Ad15 Output Parameters (ad15_out_params)
+        boolflag = f.readline().split()[0]
+        if boolflag == 'False':
+            self.fst_vt.ad15_out_params.SumPrint = False
+        else:
+            self.fst_vt.ad15_out_params.SumPrint = True
+        self.fst_vt.ad15_out_params.NBlOuts = int(f.readline().split()[0])
+        blouts = f.readline().split(',')
+        if self.fst_vt.ad15_out_params.NBlOuts != 0: #loop over elements if there are gauges to be added, otherwise assign directly
+            for i in range(self.fst_vt.ad15_out_params.NBlOuts):
+                self.fst_vt.ad15_out_params.BlOutNd.append(blouts[i])
+            self.fst_vt.ad15_out_params.BlOutNd[-1] = self.fst_vt.ad15_out_params.BlOutNd[-1][:-1]   #remove last (newline) character
+        else:
+            self.fst_vt.ad15_out_params.BlOutNd = blouts
+            self.fst_vt.ad15_out_params.BlOutNd = self.fst_vt.ad15_out_params.BlOutNd[-1][:-1]
+        self.fst_vt.ad15_out_params.NTwOuts = int(f.readline().split()[0])
+        touts = f.readline().split(',')
+        if self.fst_vt.ad15_out_params.NTwOuts != 0:
+            for i in range(self.fst_vt.ad15_out_params.NTwOuts):
+                self.fst_vt.ad15_out_params.TwOutNd.append(touts[i])
+            self.fst_vt.ad15_out_params.TwOutNd[-1] = self.fst_vt.ad15_out_params.TwOutNd[-1][:-1]
+        else:
+            self.fst_vt.ad15_out_params.TwOutNd = touts
+            self.fst_vt.ad15_out_params.TwOutNd[-1] = self.fst_vt.ad15_out_params.TwOutNd[-1][:-1]
+
+        # Outlist (TODO:BECMAX - add outlist)
+        
+        # Aerodyn15 Outlist
+        f.readline()
+        data = f.readline()
+        while data.split()[0] != 'END':
+            channels = data.split('"')
+            channel_list = channels[1].split(',')
+            for i in range(len(channel_list)):
+                channel_list[i] = channel_list[i].replace(' ','')
+                if channel_list[i] in self.fst_vt.outlist.aerodyn15_vt.__dict__.keys():
+                    self.fst_vt.outlist.aerodyn15_vt.__dict__[channel_list[i]] = True
+            data = f.readline()
+
+
+        f.close()
+
+        # create airfoil objects (TODO:BECMAX - add proper methods for airfoils, airfoils are just copied for now)
+        
+        
+        #for i in range(self.fst_vt.blade_aero15.NumAFfiles):
+        #clear    self.fst_vt.blade_aero15.af_data.append(self.initFromAerodynFile(os.path.join(self.fst_directory,self.fst_vt.blade_aero15.NumAFfiles[i])))
+
+    def initFromAerodyn15File(self, aerodynFile): # kld - added for fast noise
+        """
+        Construct array of polars from Aerodyn15 file
+
+        Arguments:
+        aerodynFile - path/name of a properly formatted Aerodyn15 file
+        """
+        # open aerodyn file
+        f = open(aerodynFile, 'r')
+        
+        airfoil = AD15Airfoil()
+
+        # skip through header
+        f.readline()
+        f.readline()   
+        
+        airfoil.InterpOrd = f.readline().split()[0]              
+        airfoil.NonDimArea = float(f.readline().split()[0])                            
+        airfoil.NumCoords = int(f.readline().split()[0])          
+        airfoil.NumTabs = int.readline().split()[0]          
+
+        # loop through tables
+        for i in range(airfoil.NumTabs):
+ 
+            polar = AD15AirfoilPolar()
+
+            polar.Re = float(f.readline().split()[0]) 
+            polar.Ctrl = int(f.readline().split()[0]) 
+            polar.InclUAdata = f.readline().split()[0]
+            polar.alpha0 = float(f.readline().split()[0]) 
+            polar.alpha1 = float(f.readline().split()[0]) 
+            polar.alpha2 = float(f.readline().split()[0]) 
+            polar.eta_e = float(f.readline().split()[0]) 
+            polar.C_nalpha = float(f.readline().split()[0]) 
+            polar.T_f0 = float(f.readline().split()[0]) 
+            polar.T_V0 = float(f.readline().split()[0]) 
+            polar.T_p = float(f.readline().split()[0]) 
+            polar.T_VL = float(f.readline().split()[0]) 
+            polar.b1 = f.readline().split()[0]
+            polar.b2 = f.readline().split()[0] 
+            polar.b5 = float(f.readline().split()[0]) 
+            polar.A1 = f.readline().split()[0]
+            polar.A2 = f.readline().split()[0]
+            polar.A5 = f.readline().split()[0]
+            polar.S1 = float(f.readline().split()[0]) 
+            polar.S2 = float(f.readline().split()[0]) 
+            polar.S3 = float(f.readline().split()[0]) 
+            polar.S4 = float(f.readline().split()[0]) 
+            polar.Cn1 = float(f.readline().split()[0]) 
+            polar.Cn2 = float(f.readline().split()[0]) 
+            polar.St_sh = float(f.readline().split()[0]) 
+            polar.Cd0 = float(f.readline().split()[0]) 
+            polar.Cm0 = float(f.readline().split()[0]) 
+            polar.k0 = float(f.readline().split()[0]) 
+            polar.k1 = float(f.readline().split()[0]) 
+            polar.k2 = float(f.readline().split()[0]) 
+            polar.k3 = float(f.readline().split()[0]) 
+            polar.k1_hat = float(f.readline().split()[0]) 
+            polar.x_cp_bar = float(f.readline().split()[0]) 
+            polar.UACutout = float(f.readline().split()[0]) 
+            polar.filtCutOff = float(f.readline().split()[0]) 
+
+
+            alpha = []
+            cl = []
+            cd = []
+            cm = []
+            # read polar information line by line
+            while True:
+                line = f.readline()
+                if 'EOT' in line:
+                    break
+                data = [float(s) for s in line.split()]
+                if len(data) < 1:
+                    break
+                alpha.append(data[0])
+                cl.append(data[1])
+                cd.append(data[2])
+                # cm.append(data[3]) [AH] does not appear to be used in current version...
+            polar.Alpha = alpha
+            polar.Cl = cl
+            polar.Cd = cd
+            polar.Cm = cm
+            airfoil.af_tables.append(polar)
+
+        f.close()
+
+        return airfoil
 
     def initFromAerodynFile(self, aerodynFile, mode): # kld - added for fast noise
         """
@@ -873,7 +1209,11 @@ class Fst8InputReader(Fst8InputBase):
             self.fst_vt.sd_sim_ctrl.Echo = False
         else:
             self.fst_vt.sd_sim_ctrl.Echo = True
-        self.fst_vt.sd_sim_ctrl.DT = float(f.readline().split()[0])
+        DT_line = f.readline().split()[0]
+        try:
+            self.fst_vt.sd_sim_ctrl.DT = float(DT_line)
+        except:
+            self.fst_vt.sd_sim_ctrl.DT = DT_line[1:-1]
 
         # Pitch Control (pitch_ctrl)
         f.readline()
@@ -968,8 +1308,8 @@ class Fst8InputReader(Fst8InputBase):
 
         # Bladed Interface and Torque-Speed Look-Up Table (bladed_interface)
         f.readline()
-        self.fst_vt.bladed_interface.DLL_FileName = f.readline().split()[0][1:-1]
-        self.fst_vt.bladed_interface.DLL_InFile   = f.readline().split()[0][1:-1]
+        self.fst_vt.bladed_interface.DLL_FileName = fix_path(f.readline().split()[0])[1:-1]
+        self.fst_vt.bladed_interface.DLL_InFile   = fix_path(f.readline().split()[0])[1:-1]
         self.fst_vt.bladed_interface.DLL_ProcName = f.readline().split()[0][1:-1]
         dll_dt_line = f.readline().split()[0]
         try:
@@ -1040,10 +1380,7 @@ class Fst8InputReader(Fst8InputBase):
 
 
 if __name__=="__main__":
-    path = "this\\was\\a\\windows\\path"
-    new = fix_path(path)
-    print "path, newpath", path, new
-    path = "this/was/a/linux/path"
-    new = fix_path(path)
-    print "path, newpath", path, new
+    
+    pass
+
 

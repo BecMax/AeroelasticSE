@@ -56,7 +56,7 @@ class FstOutputParams(object):
 		self.SumPrint   = False
 		self.SttsTime   = 0.0
 		self.ChkptTime  = 0.0
-		self.DT_Out     = 0.0
+		self.DT_Out     = ''
 		self.OutFileFmt = 0
 		self.TabDelim   = False
 		self.OutFmt     = ''
@@ -169,7 +169,7 @@ class MassInertia(object):
 	def __init__(self):
 		self.TipMass1   = 0.0
 		self.TipMass2   = 0.0
-		self.TipMass2   = 0.0
+		self.TipMass3   = 0.0
 		self.HubMass    = 0.0
 		self.HubIner    = 0.0
 		self.GenIner    = 0.0
@@ -419,6 +419,7 @@ class AeroDyn(object):
 		self.AirDens = 1.225   #units='kg / (m**3)', desc='Air density (kg/m^3)
 		self.KinVisc = 1.464e-5   #units='m**2 / s', desc='Kinematic air viscosity [CURRENTLY IGNORED] (m^2/sec)
 		self.DTAero = 0.02479   #units='s', desc = 'Time interval for aerodynamic calculations (sec)
+		
 
 # AeroDyn Blade
 class AeroDynBlade(object):
@@ -459,6 +460,142 @@ class ADAirfoil(object):
 	    self.description = ''   #description of airfoil
 	    self.number_tables = 0   #number of airfoil polars
 	    self.af_tables = []   #list of airfoil polars
+	    
+# AeroDyn15 Parameters
+class AeroDyn15(object):
+	def __init__(self):
+		# General Options
+		self.Echo = False #Echo the input to "<rootname>.AD.ech"?  (flag)
+		self.DTAero = ''    #Time interval for aerodynamic calculations {or "default"} (s)
+		self.WakeMod = 0   #Type of wake/induction model (switch) {0=none, 1=BEMT}
+		self.AFAeroMod = 0   #Type of blade airfoil aerodynamics model (switch) {1=steady model, 2=Beddoes-Leishman unsteady model}
+		self.TwrPotent = 0   #Type tower influence on wind based on potential flow around the tower (switch) {0=none, 1=baseline potential flow, 2=potential flow with Bak correction}
+		self.TwrShadow = False  #Calculate tower influence on wind based on downstream tower shadow? (flag)
+		self.TwrAero = False   #Calculate tower aerodynamic loads? (flag)
+		self.FrozenWake = False   #Assume frozen wake during linearization? (flag) [used only when WakeMod=1 and when linearizing]
+		# openfast
+		self.CavitCheck = False   #Perform cavitation check? (flag) TRUE will turn off unsteady aerodynamics
+       
+		# Environmental Conditions 
+		self.AirDens = 0.0   #Air density (kg/m^3)
+		self.KinVisc = 0.0   #Kinematic air viscosity (m^2/s)
+		self.SpdSound = 0.0   #Speed of sound (m/s)
+		# openfast
+		self.Patm = 0.0   # Atmospheric pressure (Pa) [used only when CavitCheck=True]	
+		self.Pvap = 0.0   # Vapour pressure of fluid (Pa) [used only when CavitCheck=True]
+		self.FluidDepth = 0.0   # Water depth above mid-hub height (m) [used only when CavitCheck=True]		
+		
+		# Blade-Element/Momentum Theory Options
+		self.SkewMod = 0			# Type of skewed-wake correction model (switch) {1=uncoupled, 2=Pitt/Peters, 3=coupled} [used only when WakeMod=1]
+		
+		#openfast
+		self.SkewModFactor = ''       # Constant used in Pitt/Peters skewed wake model {or "default" is 15/32*pi} (-) [used only when SkewMod=2; unused when WakeMod=0]
+		
+		self.TipLoss = False			# Use the Prandtl tip-loss model? (flag) [used only when WakeMod=1]
+		self.HubLoss = False			# Use the Prandtl hub-loss model? (flag) [used only when WakeMod=1]
+		self.TanInd = False			 # Include tangential induction in BEMT calculations? (flag) [used only when WakeMod=1]
+		self.AIDrag = False			 # Include the drag term in the axial-induction calculation? (flag) [used only when WakeMod=1]
+		self.TIDrag = False			 # Include the drag term in the tangential-induction calculation? (flag) [used only when WakeMod=1 and TanInd=TRUE]
+		self.IndToler = ''		   # Convergence tolerance for BEMT nonlinear solve residual equation {or "default"} (-) [used only when WakeMod=1]
+		self.MaxIter = 0			# Maximum number of iteration steps (-) [used only when WakeMod=1]
+		# openfast - Dynamic Blade-Element/Momentum Theory Options
+		self.DBEMT_Mod = 0         # Type of dynamic BEMT (DBEMT) model {1=constant tau1, 2=time-dependent tau1} (-) [used only when WakeMod=2]
+		self.tau1_const = 0.0      # Time constant for DBEMT (s) [used only when WakeMod=2 and DBEMT_Mod=1]
+		# Beddoes-Leishman Unsteady Airfoil Aerodynamics Options
+		self.UAmod = 0             # Unsteady Aero Model Switch (switch) {1=Baseline model (Original), 2=Gonzalez variant (changes in Cn,Cc,Cm), 3=Minemma/Pierce variant (changes in Cc and Cm)} [used only when AFAeroMod=2]
+		self.FLookup = False    # Flag to indicate whether a lookup for f' will be calculated (TRUE) or whether best-fit exponential equations will be used (FALSE); if FALSE S1-S4 must be provided in airfoil input files (flag) [used only when AFAeroMod=2]
+		
+		# Airfoil Information
+		self.InCol_Alfa	= 0	 # The column in the airfoil tables that contains the angle of attack (-)
+		self.InCol_Cl = 0 		   # The column in the airfoil tables that contains the lift coefficient (-)
+		self.InCol_Cd = 0		   # The column in the airfoil tables that contains the drag coefficient (-)
+		self.InCol_Cm = 0		   # The column in the airfoil tables that contains the pitching-moment coefficient; use zero if there is no Cm column (-)
+		self.InCol_Cpmin = 0		# The column in the airfoil tables that contains the Cpmin coefficient; use zero if there is no Cpmin column (-)
+
+		# Rotor/Blade Properties
+		self.UseBlCm = False   # Include aerodynamic pitching moment in calculations?  (flag)
+		self.ADBlFile1 = ''   # Name of file containing distributed aerodynamic properties for Blade #1 (-)
+		self.ADBlFile2 = ''   # Name of file containing distributed aerodynamic properties for Blade #2 (-) [unused if NumBl < 2]
+		self.ADBlFile3 = ''   # Name of file containing distributed aerodynamic properties for Blade #3 (-) [unused if NumBl < 3]
+		
+# AeroDyn15 Blade
+class AeroDyn15Blade(object):
+	def __init__(self):
+		self.NumAFfiles	= 0		 # Number of airfoil files used (-)
+		self.AFNames = zeros([1])   # Airfoil file names (NumAFfiles lines) (quoted strings)
+
+		self.af_data = []   #list of airfoild data sets
+		
+		
+class AeroDyn15Tower(object):
+	def __init__(self):
+		self.NumTwrNds  = 0   # Number of tower nodes used in the analysis  (-) [used only when TwrPotent/=0, TwrShadow=True, or TwrAero=True]
+		self.TwrElev = zeros([1])   #
+		self.TwrDiam = zeros([1])   #
+		self.TwrCd = zeros([1])   #
+		
+
+# AeroDyn airfoil
+class AD15Airfoil(object):
+	def __init__(self):
+	    self.description = ''   #description of airfoil
+	    self.InterpOrd = ''	# Interpolation order to use for quasi-steady table lookup {1=linear; 3=cubic spline; "default"} [default=3]						
+	    self.NonDimArea = 0.0	# The non-dimensional area of the airfoil (area/chord^2) (set to 1.0 if unsure or unneeded)						
+	    self.NumCoords = 0         # The number of coordinates in the airfoil shape file.  Set to zero if coordinates not included.						
+	    self.NumTabs = 0	# Number of airfoil tables in this file.  Each table must have lines for Re and Ctrl.
+	    self.af_tables = []   #list of airfoil polars
+
+	    
+# AeroDyn Airfoil Polar
+class AD15AirfoilPolar(object):
+	def __init__(self):			
+		self.Re = 0.0	# Reynolds number in millions						
+		self.Ctrl = 0	# Control setting (must be 0 for current AirfoilInfo)						
+		self.InclUAdata = False	# Is unsteady aerodynamics data included in this table? If TRUE, then include 30 UA coefficients below this line											
+		self.alpha0 = 0.0 # 0-lift angle of attack, depends on airfoil.						
+		self.alpha1 = 0.0 	# Angle of attack at f=0.7, (approximately the stall angle) for AOA>alpha0. (deg)						
+		self.alpha2 = 0.0 	# Angle of attack at f=0.7, (approximately the stall angle) for AOA<alpha0. (deg)						
+		self.eta_e = 0.0 	# Recovery factor in the range [0.85 - 0.95] used only for UAMOD=1, it is set to 1 in the code when flookup=True.	(-)					
+		self.C_nalpha = 0.0 	# Slope of the 2D normal force coefficient curve. (1/rad)						
+		self.T_f0 = 0.0 	# Initial value of the time constant associated with Df in the expression of Df and f''. [default = 3]						
+		self.T_V0 = 0.0 	# Initial value of the time constant associated with the vortex lift decay process; it is used in the expression	of C	vn.	It	depends on	Re,	M, and a
+		self.T_p = 0.0 	# Boundary-layer,leading edge pressure gradient time constant in the expression of Dp. It should be tuned based o	n ai	rfoi	l e	xperimenta	l da	ta. [def
+		self.T_VL = 0.0 	# Initial value of the time constant associated with the vortex advection process; it represents the non-dimensio	nal	time	in	semi-chor	ds,	needed f
+		self.b1 = ''	# Constant in the expression of phi_alpha^c and phi_q^c.  This value is relatively insensitive for thin airfoils,	but	may	be	different	for	turbine
+		self.b2 = ''	# Constant in the expression of phi_alpha^c and phi_q^c.  This value is relatively insensitive for thin airfoils,	but	may	be	different	for	turbine
+		self.b5 = 0.0	# Constant in the expression of K'''_q,Cm_q^nc, and k_m,q.  [from  experimental results, defaults to 5]						
+		self.A1 = ''	# Constant in the expression of phi_alpha^c and phi_q^c.  This value is relatively insensitive for thin airfoils,	but	may	be	different	for	turbine
+		self.A2 = ''	# Constant in the expression of phi_alpha^c and phi_q^c.  This value is relatively insensitive for thin airfoils,	but	may	be	different	for	turbine
+		self.A5 = ''	# Constant in the expression of K'''_q,Cm_q^nc, and k_m,q. [from experimental results, defaults to 1]						
+		self.S1 = 0.0	# Constant in the f curve best-fit for alpha0<=AOA<=alpha1; by definition it depends on the airfoil. [ignored if	UAMo	d<>1	]			
+		self.S2 = 0.0	# Constant in the f curve best-fit for         AOA> alpha1; by definition it depends on the airfoil. [ignored if	UAMo	d<>1	]			
+		self.S3 = 0.0	# Constant in the f curve best-fit for alpha2<=AOA< alpha0; by definition it depends on the airfoil. [ignored if	UAMo	d<>1	]			
+		self.S4 = 0.0	# Constant in the f curve best-fit for         AOA< alpha2; by definition it depends on the airfoil. [ignored if	UAMo	d<>1	]			
+		self.Cn1 = 0.0	# Critical value of C0n at leading edge separation. It should be extracted from airfoil data at a given Mach and	Reyn	olds	nu	mber. It c	an b	e calcul
+		self.Cn2 = 0.0	# As Cn1 for negative AOAs.						
+		self.St_sh = 0.0 	# Strouhal's shedding frequency constant.  [default = 0.19]						
+		self.Cd0 = 0.0	# 2D drag coefficient value at 0-lift.						
+		self.Cm0 = 0.0	# 2D pitching moment coefficient about 1/4-chord location, at 0-lift, positive if nose up. [If the aerodynamics c	oeff	icie	nts	table doe	s no	t includ
+		self.k0 = 0.0	# Constant in the \hat(x)_cp curve best-fit; = (\hat(x)_AC-0.25).  [ignored if UAMod<>1]						
+		self.k1 = 0.0	# Constant in the \hat(x)_cp curve best-fit.  [ignored if UAMod<>1]						
+		self.k2 = 0.0	# Constant in the \hat(x)_cp curve best-fit.  [ignored if UAMod<>1]						
+		self.k3 = 0.0	# Constant in the \hat(x)_cp curve best-fit.  [ignored if UAMod<>1]						
+		self.k1_hat = 0.0	# Constant in the expression of Cc due to leading edge vortex effects.  [ignored if UAMod<>1]						
+		self.x_cp_bar = ''	# Constant in the expression of \hat(x)_cp^v. [ignored if UAMod<>1, default = 0.2]						
+		self.UACutout = ''	# Angle of attack above which unsteady aerodynamics are disabled (deg). [Specifying the string "Default" sets UAC	utou	t to	45	degrees]		
+		self.filtCutOff = ''	# Cut-off frequency (-3 dB corner frequency) for low-pass filtering the AoA input to UA, as well as the 1st and 2	nd d	eriv	ati	ves (Hz) [	defa	ult = 20
+		self.Alpha = zeros([1])   #angle of attack
+		self.Cl = zeros([1])   #coefficient of lift
+		self.Cd = zeros([1])   #coefficient of dragself.Cm = zeros([1])   #coefficient of the pitching moment	 
+	    
+class AD15OutParams(object):
+	def __init__(self):
+		self.SumPrint = False
+		self.NBlOuts  = 0
+		self.BlOutNd  = []
+		self.NTwOuts  = 0
+		self.TwOutNd  = []
+
 
 # ServoDyn Simulation Control
 class SdSimCtrl(object):
@@ -608,7 +745,7 @@ class SdOutParams(object):
 # ====== INITIALIZE FAST MODEL BY INITIALIZING ALL VARIABLE TREES ======
 
 class FstModel(object):
-	def __init__(self):
+	def __init__(self, ):
 
 		# Description
 		self.description = ''
@@ -619,7 +756,7 @@ class FstModel(object):
 		self.input_files = InputFiles()
 		self.fst_output_params = FstOutputParams()
 		self.visualization = Visualization()
-                self.linearization = Linearization()
+		self.linearization = Linearization()
 		self.fst_out_params = FstOutputParams()
 		
 		# Elastodyn vartrees
@@ -650,7 +787,11 @@ class FstModel(object):
 		# AeroDyn vartrees
 		self.aerodyn = AeroDyn()
 		self.blade_aero = AeroDynBlade()
-
+		self.aerodyn15 = AeroDyn15()
+		self.blade_aero15 = AeroDyn15Blade()
+		self.tower_aero15 = AeroDyn15Tower()
+		self.ad15_out_params = AD15OutParams()
+			
 		# ServoDyn vartrees
 		self.sd_sim_ctrl = SdSimCtrl()
 		self.pitch_ctrl = PitchCtrl()

@@ -15,5 +15,5 @@ writer.run_dir = 'test'
 writer.execute()
 
 wrapper.run_dir = writer.run_dir
-wrapper.turbsim_exe = '/Users/jquick/SE/TurbSim/bin/TurbSim_glin64'
+wrapper.turbsim_exe = 'TurbSim_x64.exe'
 wrapper.execute()
